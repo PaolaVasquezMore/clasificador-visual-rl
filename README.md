@@ -37,13 +37,20 @@ pip install pyserial colorama numpy matplotlib
 3. Cerrar CanMV IDE
 4. Ejecutar:
 ```bash
-py color_rl_system.py
+py main.py
 ```
+
+### Opciones de uso
+1. Entrenar un modelo, permite entrenar un nuevo modelo que será guardado para posterior utilizando pickle
+2. Permite utilizar en tiempo real el modelo entrenado y guardado con anterioridad
+3. Muestra las metricas del modelo para evaluar su desempeño
+4. Salida del programa
 
 ## Archivos
 - `color_rl_system.py` — Agente RL principal (PC)
 - `wondermv_sender.py` — Script MicroPython para WonderMV
 - `curvas_entrenamiento.png` — Evidencia gráfica del entrenamiento
+- `main.png` — Control de flujo de uso del programa
 
 ## Resultados
 El agente converge en promedio en 13 episodios con 76.9% de tasa de aciertos.
