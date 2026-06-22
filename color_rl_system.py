@@ -173,10 +173,10 @@ class QTableRL:
 
 
 # ─────────────────────────────────────────────────────────────
-# 5. GUARDAR Y CARGAR MODELOS
+# 5. GUARDAR CON SUS METRICAS Y CARGAR MODELOS
 # ─────────────────────────────────────────────────────────────
 
-def guardar_modelo(red: Perceptron, qtable: QTableRL, historial_rewards: list, aciertos_historico: list, nombre: str = None) -> str:
+def guardar_modelo(red: Perceptron, qtable: QTableRL, historial_rewards: list, aciertos_historico: list, nombre: str = None, politica_por_episodio: list = None) -> str:
     if nombre is None:
         nombre = f"modelo_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
     filepath = os.path.join(MODELS_DIR, f"{nombre}.pkl")
@@ -185,7 +185,8 @@ def guardar_modelo(red: Perceptron, qtable: QTableRL, historial_rewards: list, a
         'qtable': qtable,
         'timestamp': datetime.now().isoformat(),
         'rewards': historial_rewards,
-        'aciertos': aciertos_historico
+        'aciertos': aciertos_historico,
+        'politica_por_episodio': politica_por_episodio
     }
     with open(filepath, 'wb') as f:
         pickle.dump(modelo_dict, f)
@@ -252,6 +253,7 @@ def entrenar(episodios: int = 100, baud: int = 115200, guardar_como: str = None)
     historial_rewards: list[float] = []
     aciertos_historico = []
     aciertos = 0
+    politica_por_episodio = []
 
     # ── Intentar conectar WonderMV ──────────────────────────
     puerto = detectar_puerto_wondermv()
@@ -312,6 +314,10 @@ def entrenar(episodios: int = 100, baud: int = 115200, guardar_como: str = None)
         qtable.actualizar(estado, accion_id, reward, estado)
         qtable.decaer_epsilon()
 
+        # Guardado de politica
+        politica_actual = [int(np.argmax(qtable.Q[s])) for s in range(4)]
+        politica_por_episodio.append(politica_actual)
+
         # ── Mostrar en terminal ─────────────────────────────
         desplegar_color(color_accion, acierto, ep, reward)
 
@@ -341,7 +347,7 @@ def entrenar(episodios: int = 100, baud: int = 115200, guardar_como: str = None)
         ser.close()
     
     # ── Guardar modelo ──────────────────────────────────────
-    guardar_modelo(red, qtable, historial_rewards, aciertos_historico, guardar_como)
+    guardar_modelo(red, qtable, historial_rewards, aciertos_historico, guardar_como, politica_por_episodio)
 
 
 # ─────────────────────────────────────────────────────────────
@@ -453,52 +459,94 @@ if __name__ == "__main__":
 
 # metricas directas
 
-def mostrar_metricas():
+def mostrar_metricas(model_name: str = None):
     modelos = listar_modelos()
     if not modelos:
         print("❌ No hay modelos entrenados disponibles.")
         return
-    
-    filepath = modelos[0]
+    if model_name:
+        filepath = os.path.join(MODELS_DIR, f"{model_name}.pkl")
+        if not os.path.isfile(filepath):
+            print(f"❌ No se encontró el modelo: {model_name}")
+            return
     with open(filepath, 'rb') as f:
         modelo_dict = pickle.load(f)
     
     qtable = modelo_dict['qtable']
     rewards = modelo_dict.get('rewards', [])
-    
+    aciertos = modelo_dict.get('aciertos', [])
+    intentos = len(rewards)
+    tasa_aciertos = sum(aciertos) / intentos * 100 if intentos > 0 else 0
+
     if not rewards:
         print("❌ El modelo antiguo no contiene datos de historial.")
         return
+    
+    fig, axs = plt.subplots(2, 2, figsize=(10, 10))
 
-    # Gráfico 1: Recompensas
-    plt.figure(figsize=(12, 5))
-    plt.subplot(1, 2, 1)
-    plt.plot(rewards, color='lightgray', label='Recompensa Bruta')
+    # Gráfico 1: Curva de aprendizaje (reward por episodio)
+    axs[0, 0].plot(rewards, color='lightgray', label='Recompensa Bruta')
     # Media móvil
     window = min(10, len(rewards))
     media_movil = np.convolve(rewards, np.ones(window)/window, mode='valid')
-    plt.plot(range(window-1, len(rewards)), media_movil, color='blue', label=f'Media Móvil (n={window})')
-    plt.title('Evolución de la Recompensa')
-    plt.xlabel('Episodio')
-    plt.ylabel('Recompensa')
-    plt.legend()
+    axs[0, 0].plot(range(window-1, len(rewards)), media_movil, color='blue', label=f'Media Móvil (n={window})')
+    axs[0, 0].set_title('Curva de Aprendizaje')
+    axs[0, 0].set_xlabel('Episodio')
+    axs[0, 0].set_ylabel('Recompensa')
+    axs[0, 0].margins(x=0)
+    axs[0, 0].legend()
 
-    # Gráfico 2: Heatmap de la Q-Table (Matriz)
-    plt.subplot(1, 2, 2)
-    plt.imshow(qtable.Q, cmap='YlGnBu')
-    plt.colorbar(label='Valor Q')
+    # Gráfico 2: Tasa de aciertos acumulada
+    tasa_aciertos_acumulada = np.cumsum(aciertos) / (np.arange(intentos) + 1) * 100
+    axs[0, 1].plot(tasa_aciertos_acumulada, color='green', label='Tasa de Aciertos Acumulada')
+    axs[0, 1].set_title('Tasa de Aciertos Acumulada')
+    axs[0, 1].set_xlabel('Episodio')
+    axs[0, 1].set_ylabel('Tasa de Aciertos (%)')
+    axs[0, 1].margins(x=0)
+    axs[0, 1].legend()
+
+    # Gráfico 3: Heatmap de la Q-Table (Matriz)
+    im = axs[1, 0].imshow(qtable.Q, cmap='YlGnBu')
+    plt.colorbar(im, ax=axs[1, 0], label='Valor Q')
     etiquetas = ['Rojo', 'Verde', 'Amarillo', 'Inactivo']
-    plt.xticks(ticks=np.arange(4), labels=etiquetas)
-    plt.yticks(ticks=np.arange(4), labels=etiquetas)
-    plt.xlabel('Acción Tomada')
-    plt.ylabel('Estado Observado')
-    plt.title('Matriz de Convergencia Q-Table Final')
-    
-    # Agregar los valores numéricos sobre los cuadros
+    axs[1, 0].set_xticks(ticks=np.arange(4), labels=etiquetas)
+    axs[1, 0].set_yticks(ticks=np.arange(4), labels=etiquetas)
+    axs[1, 0].set_xlabel('Acción Tomada')
+    axs[1, 0].set_ylabel('Estado Observado')
+    axs[1, 0].set_title('Matriz de Convergencia Q-Table Final')
+    axs[1, 0].margins(x=0)
+    # Agregar valores de la Q-table en cada celda
     for i in range(4):
         for j in range(4):
-            plt.text(j, i, f"{qtable.Q[i, j]:.2f}", ha="center", va="center", 
-                     color="white" if qtable.Q[i, j] > qtable.Q.max()/2 else "black")
+            axs[1, 0].text(j, i, f"{qtable.Q[i, j]:.2f}", ha='center', va='center', color='black')
 
+    # Gráfico 4: Convergencia de Política (CORRECTO)
+    politica_por_episodio = modelo_dict.get('politica_por_episodio', [])
+    
+    if politica_por_episodio:
+        # Convertir a matriz: (episodios, 4 estados)
+        politica_array = np.array(politica_por_episodio)
+        
+        # Nombres de estados y acciones
+        nombres_estados = ['Rojo', 'Verde', 'Amarillo', 'Inactivo']
+        
+        
+        # Para cada estado, plotear la acción elegida en cada episodio
+        axs[1,1].plot(politica_array[:, 0], marker='o', markersize=2, label='Estado: Rojo', alpha=0.7, color='red')
+        axs[1,1].plot(politica_array[:, 1], marker='o', markersize=2, label='Estado: Verde', alpha=0.7, color='green')
+        axs[1,1].plot(politica_array[:, 2], marker='o', markersize=2, label='Estado: Amarillo', alpha=0.7, color='yellow')
+        axs[1,1].plot(politica_array[:, 3], marker='o', markersize=2, label='Estado: Inactivo', alpha=0.7, color='gray')
+
+        axs[1, 1].set_title('Convergencia de Política (Acción por Estado)')
+        axs[1, 1].set_xlabel('Episodio')
+        axs[1, 1].set_ylabel('Acción Predicha')
+        axs[1, 1].set_yticks([0, 1, 2, 3])
+        axs[1, 1].set_yticklabels(nombres_estados)
+        axs[1, 1].legend(loc='best', fontsize=8)
+        axs[1, 1].grid(True, alpha=0.3)
+    else:
+        axs[1, 1].text(0.5, 0.5, 'Sin datos de política', ha='center', va='center')
+
+    axs[1, 1].margins(x=0)
     plt.tight_layout()
     plt.show()

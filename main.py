@@ -63,8 +63,25 @@ if __name__ == "__main__":
             color_rl_system.inferencia(filepath=f"modelos_entrenados/{modelo_seleccionado}.pkl")
 
         elif opcion == "3":
-            print("Generando gráficos de métricas de entrenamiento del último modelo...")
-            color_rl_system.mostrar_metricas()
+            print("Obtención de métricas de entrenamiento y resultados")
+            modelos_disponibles = [f[:-4] for f in os.listdir("modelos_entrenados") if f.endswith(".pkl")]
+            if not modelos_disponibles:
+                print("No hay modelos entrenados disponibles. Por favor, entrene un modelo primero.")
+                continue
+            print("Modelos entrenados disponibles:")
+            for i, modelo in enumerate(modelos_disponibles):
+                print(f"{i+1}. {modelo}")
+            while True:
+                try:
+                    seleccion = int(input("Seleccione el numero del modelo del que desea ver las métricas: "))
+                    if 1 <= seleccion <= len(modelos_disponibles):
+                        modelo_seleccionado = modelos_disponibles[seleccion - 1]
+                        break
+                    else:
+                        print(f"Por favor, ingrese un numero entre 1 y {len(modelos_disponibles)}.")
+                except ValueError:
+                    print("Entrada no valida. Por favor, ingrese un numero.")
+            color_rl_system.mostrar_metricas(model_name=modelo_seleccionado)
         elif opcion == "4":
             print("Saliendo del programa. ¡Hasta luego!")
             break
