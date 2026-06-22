@@ -11,12 +11,16 @@ Universidad Técnica Federico Santa María 2026-1
 **Profesora:** Heilym Ramírez Rico
 
 ## Descripción
-Sistema capaz de clasificar objetos físicos según su color de forma autónoma
-usando el módulo WonderMV (K210) como entrada visual y un agente Q-learning
-tabular como mecanismo de aprendizaje por refuerzo.
+Sistema capaz de clasificar objetos físicos según su color de forma autónoma usando el módulo WonderMV como entrada visual y un agente Q-learning tabular como mecanismo de aprendizaje por refuerzo. El sistema evita las reglas estáticas y aprende asociaciones basándose en recompensas estocásticas.
+
+## Formulación del Problema (MDP)
+- **Espacio de Estados (S):** Discreto. 4 estados (Rojo, Verde, Amarillo, Inactivo) captados directamente de los blobs visuales.
+- **Espacio de Acciones (A):** Discreto. 4 posibles paneles a desplegar en terminal.
+- **Recompensa (R):** Asimétrica. +[6.0 a 10.0] por acierto, -[1.0 a 5.0] por fallo.
+- **Política de Exploración:** $\epsilon$-greedy con factor de decaimiento.
 
 ## Flujo del sistema
-WonderMV → COLOR:red/green/yellow → color_leido() → Q-table → terminal colorama
+WonderMV (procesamiento en vivo) → USB Serial → Entorno RL (Python) → Actualización Q-Table → Despliegue en consola colorama.
 
 ## Colores soportados
 | Color | Estado ID | Panel terminal |
@@ -49,12 +53,10 @@ py main.py
 ## Archivos
 - `color_rl_system.py` — Agente RL principal (PC)
 - `wondermv_sender.py` — Script MicroPython para WonderMV
-- `curvas_entrenamiento.png` — Evidencia gráfica del entrenamiento
-- `main.png` — Control de flujo de uso del programa
+- `main.py` — Control de flujo de uso del programa
 
 ## Resultados
-El agente converge en promedio en 13 episodios con 76.9% de tasa de aciertos.
-La Q-table aprende correctamente la asociación color detectado → panel desplegado.
+Se plantea demostrar convergencia estable a partir del episodio 50, logrando estabilizar la media móvil de recompensas en valores positivos constantes y demostrando que los valores máximos de la Q-Table se alinean perfectamente en la diagonal principal (estado correcto = acción correcta).
 
 ## Hardware
 - Módulo WonderMV con cámara HD 2MP y pantalla táctil
