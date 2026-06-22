@@ -22,6 +22,7 @@ import random
 import pickle
 import os
 from datetime import datetime
+import matplotlib.pyplot as plt
 
 colorama.init(autoreset=True)
 
@@ -163,8 +164,9 @@ class QTableRL:
     def decaer_epsilon(self, factor: float = 0.995, minimo: float = 0.05):
         self.epsilon = max(minimo, self.epsilon * factor)
 
-    def esta_listo(self, historial: list) -> bool:
-        if len(historial) < 10:
+    def esta_listo(self, historial: list, ep_actual: int) -> bool:
+        # Obligamos a un mínimo de 50 episodios para garantizar exploración de colores
+        if len(historial) < 10 or ep_actual < 50:
             return False
         return (np.mean(historial[-10:]) > 0 and
                 all(r > 0 for r in historial[-5:]))
@@ -174,32 +176,19 @@ class QTableRL:
 # 5. GUARDAR Y CARGAR MODELOS
 # ─────────────────────────────────────────────────────────────
 
-def guardar_modelo(red: Perceptron, qtable: QTableRL, nombre: str = None) -> str:
-    """
-    Guarda los modelos entrenados en un archivo pickle.
-    
-    Args:
-        red: Perceptron entrenado
-        qtable: QTableRL entrenado
-        nombre: nombre del archivo (sin extensión). Si es None, usa timestamp
-    
-    Returns:
-        Ruta del archivo guardado
-    """
+def guardar_modelo(red: Perceptron, qtable: QTableRL, historial_rewards: list, aciertos_historico: list, nombre: str = None) -> str:
     if nombre is None:
         nombre = f"modelo_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
-    
     filepath = os.path.join(MODELS_DIR, f"{nombre}.pkl")
-    
     modelo_dict = {
         'perceptron': red,
         'qtable': qtable,
-        'timestamp': datetime.now().isoformat()
+        'timestamp': datetime.now().isoformat(),
+        'rewards': historial_rewards,
+        'aciertos': aciertos_historico
     }
-    
     with open(filepath, 'wb') as f:
         pickle.dump(modelo_dict, f)
-    
     print(f"✅ Modelo guardado en: {filepath}")
     return filepath
 
@@ -261,6 +250,7 @@ def entrenar(episodios: int = 100, baud: int = 115200, guardar_como: str = None)
     red    = Perceptron(n=4, lr=0.1)
     qtable = QTableRL(n=4)
     historial_rewards: list[float] = []
+    aciertos_historico = []
     aciertos = 0
 
     # ── Intentar conectar WonderMV ──────────────────────────
@@ -315,6 +305,7 @@ def entrenar(episodios: int = 100, baud: int = 115200, guardar_como: str = None)
             reward = -round(random.uniform(1.0, 5.0), 1)
 
         historial_rewards.append(reward)
+        aciertos_historico.append(1 if acierto else 0)
 
         # ── Actualizar red y Q-table ────────────────────────
         red.actualizar(estado, estado, reward)     # la red aprende: entrada → misma salida
@@ -325,7 +316,7 @@ def entrenar(episodios: int = 100, baud: int = 115200, guardar_como: str = None)
         desplegar_color(color_accion, acierto, ep, reward)
 
         # ── Verificar convergencia ──────────────────────────
-        if qtable.esta_listo(historial_rewards):
+        if qtable.esta_listo(historial_rewards, ep):
             print(f"\n✅ Modelo listo en episodio {ep}")
             print(f"   Promedio reward (últimos 10): "
                   f"{np.mean(historial_rewards[-10:]):.2f}")
@@ -350,7 +341,7 @@ def entrenar(episodios: int = 100, baud: int = 115200, guardar_como: str = None)
         ser.close()
     
     # ── Guardar modelo ──────────────────────────────────────
-    guardar_modelo(red, qtable, guardar_como)
+    guardar_modelo(red, qtable, historial_rewards, aciertos_historico, guardar_como)
 
 
 # ─────────────────────────────────────────────────────────────
@@ -459,3 +450,55 @@ if __name__ == "__main__":
     else:
         # Por defecto: entrenar y guardar
         entrenar(episodios=120)
+
+# metricas directas
+
+def mostrar_metricas():
+    modelos = listar_modelos()
+    if not modelos:
+        print("❌ No hay modelos entrenados disponibles.")
+        return
+    
+    filepath = modelos[0]
+    with open(filepath, 'rb') as f:
+        modelo_dict = pickle.load(f)
+    
+    qtable = modelo_dict['qtable']
+    rewards = modelo_dict.get('rewards', [])
+    
+    if not rewards:
+        print("❌ El modelo antiguo no contiene datos de historial.")
+        return
+
+    # Gráfico 1: Recompensas
+    plt.figure(figsize=(12, 5))
+    plt.subplot(1, 2, 1)
+    plt.plot(rewards, color='lightgray', label='Recompensa Bruta')
+    # Media móvil
+    window = min(10, len(rewards))
+    media_movil = np.convolve(rewards, np.ones(window)/window, mode='valid')
+    plt.plot(range(window-1, len(rewards)), media_movil, color='blue', label=f'Media Móvil (n={window})')
+    plt.title('Evolución de la Recompensa')
+    plt.xlabel('Episodio')
+    plt.ylabel('Recompensa')
+    plt.legend()
+
+    # Gráfico 2: Heatmap de la Q-Table (Matriz)
+    plt.subplot(1, 2, 2)
+    plt.imshow(qtable.Q, cmap='YlGnBu')
+    plt.colorbar(label='Valor Q')
+    etiquetas = ['Rojo', 'Verde', 'Amarillo', 'Inactivo']
+    plt.xticks(ticks=np.arange(4), labels=etiquetas)
+    plt.yticks(ticks=np.arange(4), labels=etiquetas)
+    plt.xlabel('Acción Tomada')
+    plt.ylabel('Estado Observado')
+    plt.title('Matriz de Convergencia Q-Table Final')
+    
+    # Agregar los valores numéricos sobre los cuadros
+    for i in range(4):
+        for j in range(4):
+            plt.text(j, i, f"{qtable.Q[i, j]:.2f}", ha="center", va="center", 
+                     color="white" if qtable.Q[i, j] > qtable.Q.max()/2 else "black")
+
+    plt.tight_layout()
+    plt.show()

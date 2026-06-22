@@ -60,10 +60,11 @@ if __name__ == "__main__":
                         print(f"Por favor, ingrese un numero entre 1 y {len(modelos_disponibles)}.")
                 except ValueError:
                     print("Entrada no valida. Por favor, ingrese un numero.")
-            color_rl_system.inferencia()
+            color_rl_system.inferencia(filepath=f"modelos_entrenados/{modelo_seleccionado}.pkl")
 
         elif opcion == "3":
-            print("Mostrando metricas de entrenamiento y resultados...")
+            print("Generando gráficos de métricas de entrenamiento del último modelo...")
+            color_rl_system.mostrar_metricas()
         elif opcion == "4":
             print("Saliendo del programa. ¡Hasta luego!")
             break

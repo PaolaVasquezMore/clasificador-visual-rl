@@ -216,3 +216,7 @@ __marimo__/
 
 # Streamlit
 .streamlit/secrets.toml
+
+# Archivos basura del sistema operativo
+.DS_Store
+Thumbs.db

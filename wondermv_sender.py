@@ -47,7 +47,7 @@ def detectar_color(img):
 
 # ── Bucle principal ──────────────────────────────────────────
 ultimo_envio = 0
-INTERVALO_MS = 300
+INTERVALO_MS = 150
 
 while True:
     img   = sensor.snapshot()
