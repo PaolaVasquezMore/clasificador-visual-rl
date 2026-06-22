@@ -6,8 +6,8 @@ Universidad Técnica Federico Santa María 2026-1
 ## Integrantes
 - Patricio Guerra Ortiz — Integración hardware y salida visual
 - Paola Vásquez Moreno — Implementación algorítmica
-- Víctor Vegas Calderón — Documentación y métricas
-
+- Víctor Vegas Calderón — Documentación, métricas e implementación de código
+- Maximiliano Estay — Documentación y métricas
 **Profesora:** Heilym Ramírez Rico
 
 ## Descripción
