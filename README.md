@@ -8,6 +8,7 @@ Universidad Técnica Federico Santa María 2026-1
 - Paola Vásquez Moreno — Implementación algorítmica
 - Víctor Vegas Calderón — Documentación, métricas e implementación de código
 - Maximiliano Estay — Documentación y métricas
+
 **Profesora:** Heilym Ramírez Rico
 
 ## Descripción
